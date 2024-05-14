@@ -120,6 +120,12 @@ parser.add_argument(
     default="chat",
     help="type of prompts to be used, either chat or code",
 )
+parser.add_argument(
+    "--speculator_ckpt_singlefile",
+    action="store_true",
+    help="Manually init MLPSepculator",
+)
+
 args = parser.parse_args()
 
 if args.batch_input and args.compile and args.compile_mode == "reduce-overhead":
@@ -173,11 +179,20 @@ tokenizer = tokenizers.get_tokenizer(args.tokenizer)
 model.eval()
 torch.set_grad_enabled(False)
 speculator = None
+
 if args.speculator_path is not None:
     print("loading speculator")
     # todo: handling of remote weights in get_model
     is_local = os.path.exists(args.speculator_path) or args.speculator_source != "hf"
-    if is_local:
+    if args.speculator_ckpt_singlefile: #manual
+        print("loading speculator")
+        speculator = MLPSpeculator(
+            model.config.emb_dim, 4096, model.config.src_vocab_size, n_predict=4
+        )
+        speculator.load_state_dict(
+            torch.load(args.speculator_path, map_location=device)["model_state"]
+        )
+    elif is_local:
         speculator = get_model(
             "mlp_speculator",
             f"{args.architecture}.{args.variant}.{args.speculator_variant}",

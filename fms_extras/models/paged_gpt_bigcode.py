@@ -329,6 +329,18 @@ _20b_config = PagedGPTBigCodeConfig(
     emb_dropout=0.1,
     ln_eps=1e-5,
 )
+_34b_config = PagedGPTBigCodeConfig(
+    src_vocab_size=49152,
+    emb_dim=6144,
+    nheads=48,
+    nlayers=88,
+    pad_id=0,
+    max_pos=8192,
+    hidden_grow_factor=24576/6144,
+    p_dropout=0.1,
+    emb_dropout=0.1,
+    ln_eps=1e-5,
+)
 
 
 _architecture_name = "paged_gpt_bigcode"
@@ -349,6 +361,9 @@ models.register_model(
 )
 models.register_model(
     _architecture_name, "ibm.20b", _gpt_bigcode_factory_factory(_20b_config)
+)
+models.register_model(
+    _architecture_name, "ibm.34b", _gpt_bigcode_factory_factory(_34b_config)
 )
 
 
