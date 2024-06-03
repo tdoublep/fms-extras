@@ -211,8 +211,8 @@ class MLPSpeculator(nn.Module):
             state = self.proj[i](state) * self.state_weight + z
             state = self.activation(self.ln[i](state))  # b n d
             out.append(self.head[i](state))  # b n v
-        #return torch.stack(out, dim=0)  # h b n v
-        return torch.stack(out, dim=0) / 5  # h b n v
+        return torch.stack(out, dim=0)  # h b n v
+        #return torch.stack(out, dim=0) / 5  # h b n v
 
 
 def apply_index_map(

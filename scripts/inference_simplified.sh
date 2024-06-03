@@ -1,6 +1,19 @@
 #!/bin/bash
 
 MODEL_ARGS="\
+--variant=llama3.70b
+--model_path="/gpfs/llama3/hf/70b_instruction_tuned"
+--tokenizer="/gpfs/llama3/hf/70b_instruction_tuned"
+--model_source=hf
+--architecture=llama
+--prompt_type="code"
+--speculator_path="/gpfs/suneja/checkpoints/llama3-70b-ropefixed-tie_wt-scalednorm-4node-backup/checkpoints/step_11186_ckp.pth"
+--speculator_ckpt_singlefile
+--top_k_tokens_per_head=4,3,2,2
+--batch_input
+"
+
+MODEL_ARGS0="\
 --variant=ibm.20b
 --model_path="/gpfs/prangan/granite-20b-code-instruct"
 --tokenizer="/gpfs/prangan/granite-20b-code-instruct"
@@ -24,9 +37,9 @@ MODEL_ARGS1="\
 --top_k_tokens_per_head=4,3,2,2
 "
 
-export CUDA_VISIBLE_DEVICES=1
+#export CUDA_VISIBLE_DEVICES=1
 
 torchrun \
-    --nproc_per_node=1 \
+    --nproc_per_node=8 \
     scripts/paged_speculative_inference.py \
     ${MODEL_ARGS}

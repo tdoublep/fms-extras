@@ -144,13 +144,15 @@ if args.device_type == "cuda":
 else:
     device = torch.device(args.device_type)
 
-torch.set_default_dtype(torch.half)
+#torch.set_default_dtype(torch.half)
+torch.set_default_dtype(torch.bfloat16)
 
 # requires setting environment variable: `CUBLAS_WORKSPACE_CONFIG=:4096:8`
 if args.deterministic:
     torch.use_deterministic_algorithms(True)
 
-if args.distributed:
+#if args.distributed:
+if True:
     dist.init_process_group()
     torch._C._distributed_c10d._register_process_group("default", dist.group.WORLD)
 
@@ -170,7 +172,8 @@ model = get_model(
     checkpoint_sharding=args.checkpoint_sharding,
     device_type=args.device_type,
     source=args.model_source,
-    distributed_strategy=distr_param,
+    distributed_strategy='fsdp',
+    #distributed_strategy=distr_param,
     group=dist.group.WORLD,
 )
 decode_model = None
@@ -187,7 +190,8 @@ if args.speculator_path is not None:
     if args.speculator_ckpt_singlefile: #manual
         print("loading speculator")
         speculator = MLPSpeculator(
-            model.config.emb_dim, 4096, model.config.src_vocab_size, n_predict=4
+            #model.config.emb_dim, 4096, model.config.src_vocab_size, n_predict=4
+            model.config.emb_dim, 3584, model.config.src_vocab_size, n_predict=4, tie_emb=True, tie_head=True, tie_transition=True
         )
         speculator.load_state_dict(
             torch.load(args.speculator_path, map_location=device)["model_state"]
