@@ -37,9 +37,61 @@ MODEL_ARGS1="\
 --top_k_tokens_per_head=4,3,2,2
 "
 
-#export CUDA_VISIBLE_DEVICES=1
+MODEL_ARGS_GRANITE8B="\
+--variant=calico.8b.code
+--model_path="/gpfs/prangan/hub/models--ibm-granite--granite-8b-code-instruct/snapshots/8a0fc76e4d374188e0cc8794d2d7275aa5aa7e64"
+--tokenizer="/gpfs/prangan/hub/models--ibm-granite--granite-8b-code-instruct/snapshots/8a0fc76e4d374188e0cc8794d2d7275aa5aa7e64"
+--model_source=hf
+--architecture=llama
+--prompt_type="code"
+--speculator_ckpt_singlefile
+--top_k_tokens_per_head=5,4,3,2,2
+"
+#--speculator_path="/gpfs/prangan/backup-ckptx/checkpoints/step_15001_ckp.pth"
+
+MODEL_ARGS_GRANITE3B="\
+--variant=calico.3b.code
+--model_path="/gpfs/prangan/hub/models--ibm-granite--granite-3b-code-instruct/snapshots/4420bfb5a3361ab4714bbd653848ef1a819d9f5b/"
+--tokenizer="/gpfs/prangan/hub/models--ibm-granite--granite-3b-code-instruct/snapshots/4420bfb5a3361ab4714bbd653848ef1a819d9f5b/"
+--model_source=hf
+--architecture=llama
+--prompt_type="code"
+--speculator_ckpt_singlefile
+--top_k_tokens_per_head=5,4,3,2,2
+"
+#--speculator_path="/gpfs/prangan/ckpts/granite_3b_stage1/checkpoints/step_21001_ckp.pth"
+
+MODEL_ARGS_GRANITE3B_HF="\
+--variant="calico.3b.code"
+--model_path="/gpfs/prangan/hub/models--ibm-granite--granite-3b-code-instruct/snapshots/4420bfb5a3361ab4714bbd653848ef1a819d9f5b/"
+--tokenizer="/gpfs/prangan/hub/models--ibm-granite--granite-3b-code-instruct/snapshots/4420bfb5a3361ab4714bbd653848ef1a819d9f5b/"
+--model_source=hf
+--speculator_source=hf
+--architecture=llama
+--prompt_type="code"
+--speculator_path="/gpfs/suneja/checkpoints/granite-3b/checkpoints/granite-3b-code-instruct/accelerator"
+--speculator_variant=430m
+--speculator_source=hf
+--top_k_tokens_per_head=6,5,4,3,3
+"
+
+MODEL_ARGS_GRANITE34B_HF="\
+--variant="34b.code"
+--model_path="/gpfs/prangan/hub/models--ibm-granite--granite-34b-code-instruct/snapshots/20f67e1f9b6016f62652916d7e887c7250c46382/"
+--tokenizer="/gpfs/prangan/hub/models--ibm-granite--granite-34b-code-instruct/snapshots/20f67e1f9b6016f62652916d7e887c7250c46382/"
+--model_source=hf
+--speculator_source=hf
+--architecture=gpt_bigcode
+--prompt_type="code"
+--speculator_path="/gpfs/suneja/checkpoints/granite-34b-tp/checkpoints/granite-34b-code-instruct/accelerator"
+--speculator_variant=680m
+--speculator_source=hf
+--top_k_tokens_per_head=6,5,4,3,3
+"
+
+export CUDA_VISIBLE_DEVICES=1
 
 torchrun \
-    --nproc_per_node=8 \
+    --nproc_per_node=1 \
     scripts/paged_speculative_inference.py \
-    ${MODEL_ARGS}
+    ${MODEL_ARGS_GRANITE34B_HF}
