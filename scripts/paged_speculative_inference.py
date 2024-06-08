@@ -154,9 +154,8 @@ if args.deterministic:
 #if args.distributed:
 if True:
     dist.init_process_group()
-    torch._C._distributed_c10d._register_process_group("default", dist.group.WORLD)
+    #torch._C._distributed_c10d._register_process_group("default", dist.group.WORLD)
 
-print("loading model")
 if args.distributed:
     distr_param = "tp"
 else:
@@ -165,6 +164,7 @@ else:
     else:
         distr_param = None
 
+print("loading model")
 model = get_model(
     f"paged_{args.architecture}",
     args.variant,
@@ -172,9 +172,9 @@ model = get_model(
     checkpoint_sharding=args.checkpoint_sharding,
     device_type=args.device_type,
     source=args.model_source,
-    distributed_strategy='fsdp',
+    #distributed_strategy='fsdp',
     #distributed_strategy=distr_param,
-    group=dist.group.WORLD,
+    #group=dist.group.WORLD,
 )
 decode_model = None
 
@@ -188,15 +188,17 @@ if args.speculator_path is not None:
     # todo: handling of remote weights in get_model
     is_local = os.path.exists(args.speculator_path) or args.speculator_source != "hf"
     if args.speculator_ckpt_singlefile: #manual
-        print("loading speculator")
+        print("loading speculator singlefile")
         speculator = MLPSpeculator(
             #model.config.emb_dim, 4096, model.config.src_vocab_size, n_predict=4
-            model.config.emb_dim, 3584, model.config.src_vocab_size, n_predict=4, tie_emb=True, tie_head=True, tie_transition=True
+            model.config.emb_dim, 6144, model.config.src_vocab_size, n_predict=5, scale_input=True
+            #tie_emb=True, tie_head=True, tie_transition=True, scale_input=True,
         )
         speculator.load_state_dict(
             torch.load(args.speculator_path, map_location=device)["model_state"]
         )
     elif is_local:
+        print("loading speculator HF local")
         speculator = get_model(
             "mlp_speculator",
             f"{args.architecture}.{args.variant}.{args.speculator_variant}",
@@ -220,6 +222,7 @@ if args.speculator_path is not None:
         exit()
     print("loading complete on rank", local_rank)
 
+
 print("initializing paged cache")
 # cache setup
 from fms_extras.utils.cache.paged import PagedKVCacheManager
@@ -239,6 +242,7 @@ kv_cache_manager = PagedKVCacheManager(
     tensor_parallel_size=dist.get_world_size() if args.distributed else 1,
     dtype=torch.get_default_dtype(),
     device=device,
+    total_num_gpu_blocks=2000,
 )
 print("cache initialization complete on rank", local_rank)
 
@@ -289,7 +293,7 @@ def infer(ids, warmup):
             decode_model=decode_model,
             # todo: we can only reduce-overhead for now when batch size is 1
             flattening=not (args.compile and compile_mode == "reduce-overhead"),
-            cudagraphs=cudagraphs,
+            #cudagraphs=cudagraphs,
             threshes=args.top_k_tokens_per_head,
         )
     else:

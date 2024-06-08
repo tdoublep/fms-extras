@@ -338,6 +338,14 @@ _llama3_8b_3_2b = {
 #    "inner_dim": 4096,    
 #}
 
+_ibm_34b_code_instruct = {
+    "emb_dim": 6144,
+    "vocab_size": 49152,
+    "n_predict": 5,
+    "inner_dim": 6144,    
+    "scale_input": True,
+}
+
 _architecture_name = "mlp_speculator"
 
 
@@ -381,6 +389,12 @@ models.register_model(
 #    "gpt_bigcode.ibm.20b.1_7b",
 #    _mlp_speculator_factory_factory(_ibm_20b_code_instruct),
 #)
+
+models.register_model(
+    _architecture_name,
+    "gpt_bigcode.ibm.34b.680m",
+    _mlp_speculator_factory_factory(_ibm_34b_code_instruct),
+)
 
 def _rename_hf_weights_to_fms(orig_sd):
     new_sd = {}

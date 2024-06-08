@@ -76,16 +76,27 @@ MODEL_ARGS_GRANITE3B_HF="\
 "
 
 MODEL_ARGS_GRANITE34B_HF="\
---variant="34b.code"
+--variant="ibm.34b"
 --model_path="/gpfs/prangan/hub/models--ibm-granite--granite-34b-code-instruct/snapshots/20f67e1f9b6016f62652916d7e887c7250c46382/"
 --tokenizer="/gpfs/prangan/hub/models--ibm-granite--granite-34b-code-instruct/snapshots/20f67e1f9b6016f62652916d7e887c7250c46382/"
 --model_source=hf
---speculator_source=hf
 --architecture=gpt_bigcode
 --prompt_type="code"
 --speculator_path="/gpfs/suneja/checkpoints/granite-34b-tp/checkpoints/granite-34b-code-instruct/accelerator"
 --speculator_variant=680m
 --speculator_source=hf
+--top_k_tokens_per_head=6,5,4,3,3
+"
+
+MODEL_ARGS_GRANITE34B="\
+--variant="ibm.34b"
+--model_path="/gpfs/prangan/hub/models--ibm-granite--granite-34b-code-instruct/snapshots/20f67e1f9b6016f62652916d7e887c7250c46382/"
+--tokenizer="/gpfs/prangan/hub/models--ibm-granite--granite-34b-code-instruct/snapshots/20f67e1f9b6016f62652916d7e887c7250c46382/"
+--model_source=hf
+--speculator_ckpt_singlefile
+--architecture=gpt_bigcode
+--prompt_type="code"
+--speculator_path="/gpfs/suneja/checkpoints/granite-34b-tp-tmp/checkpoints/step_21001_ckp.pth"
 --top_k_tokens_per_head=6,5,4,3,3
 "
 
