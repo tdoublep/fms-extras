@@ -50,6 +50,7 @@ class MLPSpeculator(nn.Module):
         tie_emb=False,
         tie_head=False,
         tie_transition=False,
+        tie_wts=False,
         scale_input=False,
     ):    
         super().__init__()
@@ -59,6 +60,7 @@ class MLPSpeculator(nn.Module):
         self.inner_dim = inner_dim
         self.vsize = vocab_size
         self.scale_input = scale_input
+        print(f"Scale input: {scale_input}")
         self.emb = nn.ModuleList(
             [nn.Embedding(vocab_size, inner_dim) for _ in range(n_predict)]
         )
@@ -89,6 +91,9 @@ class MLPSpeculator(nn.Module):
         self.activation = nn.GELU()
 
         # Handle weight tying as specified
+        if tie_wts:
+            print(f"tie_wts: {tie_wts}")
+            tie_emb = tie_head = tie_transition = True
         if tie_emb:
             assert n_predict > 1, "You cannot tie embeddings when only 1 exists"
             for emb in self.emb:
@@ -324,6 +329,15 @@ _llama_13b_code = {
     "inner_dim": 4096,
 }
 
+_llama_34b_code = {
+    "emb_dim": 8192,
+    "vocab_size": 32000,
+    "n_predict": 5,
+    "inner_dim": 8192,
+    "scale_input": True,
+    "tie_wts": True
+}
+
 _llama3_8b_3_2b = {
     "emb_dim": 4096,
     "vocab_size": 128256,
@@ -331,12 +345,12 @@ _llama3_8b_3_2b = {
     "inner_dim": 3072,
 }
 
-#_ibm_20b_code_instruct = {
-#    "emb_dim": 6144,
-#    "vocab_size": 49152,
-#    "n_predict": 4,
-#    "inner_dim": 4096,    
-#}
+_ibm_20b_code_instruct = {
+    "emb_dim": 6144,
+    "vocab_size": 49152,
+    "n_predict": 4,
+    "inner_dim": 4096,    
+}
 
 _ibm_34b_code_instruct = {
     "emb_dim": 6144,
@@ -344,7 +358,17 @@ _ibm_34b_code_instruct = {
     "n_predict": 5,
     "inner_dim": 6144,    
     "scale_input": True,
+    "tie_wts": True,
 }
+
+_llama3_70b_961m = {
+    "emb_dim": 8192,
+    "vocab_size": 128256,
+    "n_predict": 4,
+    "inner_dim": 3584,
+    "scale_input": True,
+    "tie_wts": True,
+    }
 
 _architecture_name = "mlp_speculator"
 
@@ -377,18 +401,27 @@ models.register_model(
     "llama.13b.code.2b",
     _mlp_speculator_factory_factory(_llama_13b_code),
 )
-
+models.register_model(
+    _architecture_name,
+    "llama.34b.code.658m",
+    _mlp_speculator_factory_factory(_llama_34b_code),
+)
 models.register_model(
     _architecture_name,
     "llama.llama3.8b.3_2b",
     _mlp_speculator_factory_factory(_llama3_8b_3_2b),
 )
+models.register_model(
+    _architecture_name,
+    "llama.llama3.70b.961m",
+    _mlp_speculator_factory_factory(_llama3_70b_961m),
+)
 
-#models.register_model(
-#    _architecture_name,
-#    "gpt_bigcode.ibm.20b.1_7b",
-#    _mlp_speculator_factory_factory(_ibm_20b_code_instruct),
-#)
+models.register_model(
+    _architecture_name,
+    "gpt_bigcode.ibm.20b.1_7b",
+    _mlp_speculator_factory_factory(_ibm_20b_code_instruct),
+)
 
 models.register_model(
     _architecture_name,

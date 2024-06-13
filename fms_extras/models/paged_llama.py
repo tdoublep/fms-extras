@@ -392,6 +392,18 @@ _13b_code_config = PagedLLaMAConfig(
 )
 # todo: add 35B config
 
+_34b_code_config = PagedLLaMAConfig(
+    emb_dim=8192,
+    nheads=64,
+    kvheads=8,
+    nlayers=48,
+    hidden_grow_factor=22016 / 8192,
+    src_vocab_size=32000,
+    max_expected_seq_len=16384,
+    rope_theta=1_000_000,
+)
+# todo: add 35B config
+
 _70b_config = PagedLLaMAConfig(
     emb_dim=8192,
     multiple_of=4096,
@@ -426,6 +438,9 @@ models.register_model(_architecture_name, "7b", _llama_factory_factory(_7b_confi
 models.register_model(_architecture_name, "13b", _llama_factory_factory(_13b_config))
 models.register_model(
     _architecture_name, "13b.code", _llama_factory_factory(_13b_code_config)
+)
+models.register_model(
+    _architecture_name, "34b.code", _llama_factory_factory(_34b_code_config)
 )
 models.register_model(_architecture_name, "70b", _llama_factory_factory(_70b_config))
 

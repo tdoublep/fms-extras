@@ -121,9 +121,11 @@ parser.add_argument(
     help="type of prompts to be used, either chat or code",
 )
 parser.add_argument(
-    "--speculator_ckpt_singlefile",
-    action="store_true",
-    help="Manually init MLPSepculator",
+    "--speculator_load_type",
+    type=str,
+    choices=["singlefile", "registered_local", "hf_remote"],
+    default="singlefile",
+    help="how to load the speculator",
 )
 
 args = parser.parse_args()
@@ -172,7 +174,7 @@ model = get_model(
     checkpoint_sharding=args.checkpoint_sharding,
     device_type=args.device_type,
     source=args.model_source,
-    #distributed_strategy='fsdp',
+    distributed_strategy='fsdp',
     #distributed_strategy=distr_param,
     #group=dist.group.WORLD,
 )
@@ -186,19 +188,19 @@ speculator = None
 if args.speculator_path is not None:
     print("loading speculator")
     # todo: handling of remote weights in get_model
-    is_local = os.path.exists(args.speculator_path) or args.speculator_source != "hf"
-    if args.speculator_ckpt_singlefile: #manual
+    #is_local = os.path.exists(args.speculator_path) or args.speculator_source != "hf"
+    if args.speculator_load_type == "singlefile": #manual
         print("loading speculator singlefile")
         speculator = MLPSpeculator(
             #model.config.emb_dim, 4096, model.config.src_vocab_size, n_predict=4
-            model.config.emb_dim, 6144, model.config.src_vocab_size, n_predict=5, scale_input=True
+            model.config.emb_dim, 4096, model.config.src_vocab_size, n_predict=4, # tie_wts=True, scale_input=True
             #tie_emb=True, tie_head=True, tie_transition=True, scale_input=True,
         )
         speculator.load_state_dict(
             torch.load(args.speculator_path, map_location=device)["model_state"]
         )
-    elif is_local:
-        print("loading speculator HF local")
+    elif args.speculator_load_type == "registered_local":
+        print("loading speculator registered local")
         speculator = get_model(
             "mlp_speculator",
             f"{args.architecture}.{args.variant}.{args.speculator_variant}",
@@ -206,7 +208,8 @@ if args.speculator_path is not None:
             source=args.speculator_source,
             device_type=args.device_type,
         )
-    else:
+    elif args.speculator_load_type == "hf_remote":
+        print("loading speculator HF remote")
         from fms_extras.models.hf.modeling_mlp_speculator import (
             MLPSpeculatorPreTrainedModel,
         )
@@ -214,6 +217,9 @@ if args.speculator_path is not None:
         speculator = MLPSpeculatorPreTrainedModel.from_pretrained(
             args.speculator_path, device_map=args.device_type
         ).speculator
+    else:
+        print("Incorrect speculator_load_type")
+        exit(1)
     speculator = speculator.to(device)
     if len(args.top_k_tokens_per_head) != speculator.n_predict:
         print(
