@@ -3,6 +3,7 @@ import itertools
 import os
 import time
 
+import transformers
 import torch
 import torch._inductor.config
 from fms.models import get_model
@@ -174,7 +175,7 @@ model = get_model(
     checkpoint_sharding=args.checkpoint_sharding,
     device_type=args.device_type,
     source=args.model_source,
-    distributed_strategy='fsdp',
+    #distributed_strategy='fsdp',
     #distributed_strategy=distr_param,
     #group=dist.group.WORLD,
 )
@@ -193,7 +194,7 @@ if args.speculator_path is not None:
         print("loading speculator singlefile")
         speculator = MLPSpeculator(
             #model.config.emb_dim, 4096, model.config.src_vocab_size, n_predict=4
-            model.config.emb_dim, 4096, model.config.src_vocab_size, n_predict=4, # tie_wts=True, scale_input=True
+            model.config.emb_dim, 6144, model.config.src_vocab_size, n_predict=5, tie_wts=True, scale_input=True
             #tie_emb=True, tie_head=True, tie_transition=True, scale_input=True,
         )
         speculator.load_state_dict(
@@ -211,16 +212,40 @@ if args.speculator_path is not None:
     elif args.speculator_load_type == "hf_remote":
         print("loading speculator HF remote")
         from fms_extras.models.hf.modeling_mlp_speculator import (
-            MLPSpeculatorPreTrainedModel,
+            MLPSpeculatorPreTrainedModel, MLPSpeculatorConfig
         )
-
+        
         speculator = MLPSpeculatorPreTrainedModel.from_pretrained(
-            args.speculator_path, device_map=args.device_type
+            args.speculator_path, #device_map=args.device_type
         ).speculator
+
+
+        #config = MLPSpeculatorConfig.from_pretrained(args.speculator_path)
+        #speculator =  MLPSpeculatorPreTrainedModel(config)
+        #speculator.load_state_dict(
+        #    transformers.modeling_utils.load_state_dict(args.speculator_path + '/pytorch_model.bin'),
+        #    strict=False)
+        #speculator = speculator.speculator
+
     else:
         print("Incorrect speculator_load_type")
         exit(1)
+
+    if local_rank == 0:
+        total_params = sum(
+            p.numel() for p in speculator.parameters() if p.requires_grad
+        )
+        print(f"\nspeculator has {total_params / 1e6} Million params\n")        
+        #print([i for i,j in speculator.named_parameters()])
+        #print(torch.cuda.memory_summary())
+        #exit(0)
     speculator = speculator.to(device)
+    if local_rank == 0:
+        total_params = sum(
+            p.numel() for p in speculator.parameters() if p.requires_grad
+        )
+        print(f"\nspeculator has {total_params / 1e6} Million params\n")        
+
     if len(args.top_k_tokens_per_head) != speculator.n_predict:
         print(
             "length of top_k_tokens_per_head must be equal to the speculator's number of heads (n_predict)"

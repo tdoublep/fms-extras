@@ -125,12 +125,14 @@ MODEL_ARGS_GRANITE34B_HF="\
 --model_source=hf
 --architecture=gpt_bigcode
 --prompt_type="code"
---speculator_path="/gpfs/suneja/checkpoints/granite-34b-tp/checkpoints/granite-34b-code-instruct/accelerator"
 --speculator_variant=680m
+--speculator_path="/gpfs/suneja/checkpoints/granite-34b-tp/checkpoints/granite-34b-code-instruct/accelerator"
 --speculator_source=hf
 --speculator_load_type=hf_remote
 --top_k_tokens_per_head=6,5,4,3,3
 "
+#--speculator_path="/gpfs/suneja/checkpoints/granite-34b-tp/checkpoints/hf_ckpt_without_tie_wts/granite-34b-code-instruct/accelerator"
+#--speculator_path="/gpfs/suneja/checkpoints/granite-34b-tp/checkpoints/hf_ckpt_with_tie_wts_v1/granite-34b-code-instruct/accelerator"
 
 MODEL_ARGS_GRANITE34B="\
 --variant="ibm.34b"
@@ -211,8 +213,8 @@ MODEL_ARGS_LLAMA3_70B_HF="\
 "
 
 
-#export CUDA_VISIBLE_DEVICES=1
+export CUDA_VISIBLE_DEVICES=1
 torchrun \
-    --nproc_per_node=8 \
+    --nproc_per_node=1 \
     scripts/paged_speculative_inference.py \
-    ${MODEL_ARGS_LLAMA3_70B_HF}
+    ${MODEL_ARGS_GRANITE34B_HF}
