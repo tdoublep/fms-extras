@@ -4,4 +4,4 @@
 torch ~= 2.2.0 # This is what is installed in CI today
 ibm-fms >= 0.0.4
 transformers >= 4.40.2
-accelerate >= 0.30.0
+accelerate >= 0.27.2
