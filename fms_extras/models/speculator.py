@@ -415,11 +415,6 @@ models.register_model(
 )
 models.register_model(
     _architecture_name,
-    "llama.llama3.8b.3_2b",
-    _mlp_speculator_factory_factory(_llama3_8b_3_2b),
-)
-models.register_model(
-    _architecture_name,
     "llama.llama3.70b.961m",
     _mlp_speculator_factory_factory(_llama3_70b_961m),
 )
