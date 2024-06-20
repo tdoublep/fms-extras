@@ -22,7 +22,7 @@ class MLPSpeculatorConfig(PretrainedConfig):
         n_predict: int = 3,
         top_k_tokens_per_head: List[int] = [5, 4, 3],
         n_candidates: int = 5,
-        tie_wts: bool = False,
+        tie_weights: bool = False,
         scale_input: bool = False,
         **kwargs
     ):
@@ -51,7 +51,7 @@ class MLPSpeculatorConfig(PretrainedConfig):
         self.n_predict = n_predict
         self.top_k_tokens_per_head = top_k_tokens_per_head
         self.n_candidates = n_candidates
-        self.tie_wts = tie_wts
+        self.tie_weights = tie_weights
         self.scale_input = scale_input
         super().__init__(**kwargs)
 
@@ -72,12 +72,12 @@ class MLPSpeculatorPreTrainedModel(PreTrainedModel):
             inner_dim=config.inner_dim,
             vocab_size=config.vocab_size,
             n_predict=config.n_predict,
-            tie_wts=config.tie_wts,
+            tie_weights=config.tie_weights,
             scale_input=config.scale_input,
         )
         if speculator is None:
             self.speculator = MLPSpeculator(
-                config.emb_dim, config.inner_dim, config.vocab_size, config.n_predict, tie_wts=config.tie_wts, scale_input=config.scale_input
+                config.emb_dim, config.inner_dim, config.vocab_size, config.n_predict, tie_weights=config.tie_weights, scale_input=config.scale_input
             )
             self.speculator.reset_parameters()
         else:
@@ -89,7 +89,7 @@ class MLPSpeculatorPreTrainedModel(PreTrainedModel):
         model: MLPSpeculator,
         top_k_tokens_per_head: List[int],
         n_candidates: int,
-        tie_wts: bool = False,
+        tie_weights: bool = False,
         scale_input: bool = False,
         *args,
         **kwargs
@@ -101,7 +101,7 @@ class MLPSpeculatorPreTrainedModel(PreTrainedModel):
             n_predict=model.n_predict,
             top_k_tokens_per_head=top_k_tokens_per_head,
             n_candidates=n_candidates,
-            tie_wts=tie_wts,
+            tie_weights=tie_weights,
             scale_input=scale_input,
         )
         return cls(config, model)
