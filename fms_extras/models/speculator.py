@@ -323,7 +323,7 @@ _llama_34b_code = {
     "n_predict": 5,
     "inner_dim": 8192,
     "scale_input": True,
-    "tie_wts": True
+    "tie_weights": True
 }
 
 _llama3_8b_3_2b = {
@@ -346,7 +346,7 @@ _ibm_34b_code_instruct = {
     "n_predict": 5,
     "inner_dim": 6144,    
     "scale_input": True,
-    "tie_wts": True,
+    "tie_weights": True,
 }
 
 _llama3_70b_961m = {
@@ -355,7 +355,7 @@ _llama3_70b_961m = {
     "n_predict": 4,
     "inner_dim": 3584,
     "scale_input": True,
-    "tie_wts": True,
+    "tie_weights": True,
     }
 
 _architecture_name = "mlp_speculator"
