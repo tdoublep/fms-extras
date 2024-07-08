@@ -410,7 +410,8 @@ _70b_config = PagedLLaMAConfig(
     nheads=64,
     kvheads=8,
     nlayers=80,
-    hidden_grow_factor=(1.3 * 8 / 3),
+    #hidden_grow_factor=(1.3 * 8 / 3),
+    hidden_grow_factor=28672/8192,
 )
 
 _architecture_name = "paged_llama"

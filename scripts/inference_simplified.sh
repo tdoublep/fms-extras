@@ -212,9 +212,17 @@ MODEL_ARGS_LLAMA3_70B_HF="\
 --top_k_tokens_per_head=4,3,2,2
 "
 
+MODEL_ARGS_GRANITE13B="\
+--variant="ibm.13b"
+--model_path="/gpfs/suneja/models/dmf_models/granite.13b.chat.v2.1-main/"
+--tokenizer="/gpfs/suneja/models/dmf_models/granite.13b.chat.v2.1-main/"
+--model_source=hf
+--architecture=gpt_bigcode
+--prompt_type="code"
+"
 
 export CUDA_VISIBLE_DEVICES=1
 torchrun \
     --nproc_per_node=1 \
     scripts/paged_speculative_inference.py \
-    ${MODEL_ARGS_GRANITE34B_HF}
+    ${MODEL_ARGS_GRANITE13B}

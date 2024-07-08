@@ -104,7 +104,8 @@ class MLPSpeculator(nn.Module):
     def reset_parameters(self):
         for m in self.modules():
             if isinstance(m, nn.Embedding) or isinstance(m, nn.Linear):
-                nn.init.trunc_normal_(m.weight, 0, 1 / math.sqrt(self.inner_dim))
+                #nn.init.trunc_normal_(m.weight, 0, 1 / math.sqrt(self.inner_dim))
+                nn.init.normal_(m.weight, 0, 1 / math.sqrt(self.inner_dim))
             elif isinstance(m, LayerNormParameterized) and hasattr(m, "weight"):
                 m.weight.data.fill_(1)
                 m.bias.data.zero_()
@@ -210,6 +211,7 @@ class MLPSpeculator(nn.Module):
             state = self.proj[i](state) * self.state_weight + z
             state = self.activation(self.ln[i](state))  # b n d
             out.append(self.head[i](state))  # b n v
+        #print([i.std() for i in out])    
         return torch.stack(out, dim=0)  # h b n v
         #return torch.stack(out, dim=0) / 5  # h b n v
 
