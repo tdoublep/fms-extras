@@ -46,12 +46,13 @@ MODEL_ARGS_GRANITE_20B_HF="\
 --model_source=hf
 --architecture=gpt_bigcode
 --prompt_type="code"
---speculator_path="/gpfs/suneja/models/hub/models--ibm-granite--granite-20b-code-instruct-accelerator/snapshots/ba7a42036002f21f7536df750c398966b0cb8ad9"
+--speculator_path="/gpfs/suneja/models/granite-20b-code-instruct-accelerator"
 --speculator_source=hf
 --speculator_variant=1_7b
 --speculator_load_type=hf_remote
 --top_k_tokens_per_head=4,3,2,2
 "
+#--speculator_path="/gpfs/suneja/models/hub/models--ibm-granite--granite-20b-code-instruct-accelerator/snapshots/ba7a42036002f21f7536df750c398966b0cb8ad9"
 
 MODEL_ARGS1="\
 --variant="llama3.8b"
@@ -212,17 +213,33 @@ MODEL_ARGS_LLAMA3_70B_HF="\
 --top_k_tokens_per_head=4,3,2,2
 "
 
-MODEL_ARGS_GRANITE13B="\
+MODEL_ARGS_GRANITE13B_HF="\
 --variant="ibm.13b"
 --model_path="/gpfs/suneja/models/dmf_models/granite.13b.chat.v2.1-main/"
 --tokenizer="/gpfs/suneja/models/dmf_models/granite.13b.chat.v2.1-main/"
 --model_source=hf
 --architecture=gpt_bigcode
---prompt_type="code"
+--speculator_path="/gpfs/suneja/checkpoints/granite-13b-chat-v2.1-cconly/checkpoints/accelerator"
+--speculator_source=hf
+--speculator_load_type=hf_remote
+--top_k_tokens_per_head=4,3,2,2
 "
+
+MODEL_ARGS_LLAMA2_70B_HF="\
+--variant="70b"
+--model_path="/gpfs/suneja/models/Llama-2-70b-chat-hf"
+--tokenizer="/gpfs/suneja/models/Llama-2-70b-chat-hf"
+--model_source=hf
+--architecture=llama
+--speculator_path="/gpfs/suneja/checkpoints/llama2-70b-tp-wtinitfix/checkpoints/Llama-2-70b-chat-hf/accelerator"
+--speculator_source=hf
+--speculator_load_type=hf_remote
+--top_k_tokens_per_head=4,3,2,2
+"
+
 
 export CUDA_VISIBLE_DEVICES=1
 torchrun \
     --nproc_per_node=1 \
     scripts/paged_speculative_inference.py \
-    ${MODEL_ARGS_GRANITE13B}
+    ${MODEL_ARGS_GRANITE13B_HF}
