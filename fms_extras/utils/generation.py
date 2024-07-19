@@ -9,6 +9,7 @@ import torch.nn.functional as F
 from fms_extras.models.speculator import MLPSpeculator, apply_index_map, flatten_batch
 from fms_extras.utils.cache.paged import PagedAttentionCacheData, PagedKVCacheManager
 
+import os
 
 def __execute_prefill(
     model: Union[nn.Module, Callable],
@@ -254,6 +255,7 @@ def __get_best_candidates(
     ).squeeze(
         1
     )  # b 1+h d
+
     return next_vals, embeds, n_correct, best_guess
 
 
@@ -443,6 +445,8 @@ def speculative_generate(
         decode_model = model
     bsize = len(input_ids)
 
+    local_rank = int(os.getenv("LOCAL_RANK", 0))
+
     if cudagraphs and (flattening or bsize != 1):
         raise NotImplementedError(
             "cudagraphs is not yet supported for batch sizes greater than 1 or flatting"
@@ -472,6 +476,7 @@ def speculative_generate(
     parent_sequence_ids = cache_data.sequence_ids
     n_gen = [0] * bsize
     n_steps = 0
+    num_gen_tokens = 0
     input_ids = torch.argmax(logits, dim=2)  # b 1
     result = [
         torch.cat((line, input_id), dim=0)
@@ -483,7 +488,10 @@ def speculative_generate(
     model_input_lengths = [inp_len] * (input_ids.size(0) * n_candidates)
 
     # perform decode step
-    while min(n_gen) < new_tokens:
+    stop = False
+
+    while (1 + min(n_gen)) < new_tokens and not stop:
+
         n_steps += 1
 
         # allocate candidate sequences in cache and get the sequence ids
@@ -530,16 +538,32 @@ def speculative_generate(
         result = [torch.cat(x, dim=0) for x in zip(result, next_vals_list)]
         input_ids = torch.stack([line[-1:] for line in next_vals_list], dim=0)  # b 1
 
+        # stop
+        for i, tok in enumerate(next_vals_list[0]):
+            if tok == 0:
+                next_vals_list[0] = next_vals_list[0][:1+i]
+                stop = True
+
+        for i, _ in enumerate(next_vals_list[0]):
+            if (1 + n_gen[0] + i + 1) > new_tokens:
+                next_vals_list[0] = next_vals_list[0][:i]
+                break
+
+        num_gen_tokens += len(next_vals_list[0])
+
         # update number of generated tokens per sequence
         n_gen = [
             n_gen_i + next_vals_i.size(0)
             for n_gen_i, next_vals_i in zip(n_gen, next_vals_list)
         ]
 
+        if local_rank == 0:
+            print(n_steps, num_gen_tokens, next_vals_list, n_gen)
+
     # free final parent sequences from the kv-cache
     kv_cache_manager.free_sequences(parent_sequence_ids, recursive=True)
 
-    return result, n_steps, ttft, (time.time() - start_time)
+    return result, n_steps, num_gen_tokens, ttft, (time.time() - start_time)
 
 
 def __create_prefill_mask(
@@ -607,6 +631,8 @@ def paged_generate(
 
     bsize = len(input_ids_list)
 
+    local_rank = int(os.getenv("LOCAL_RANK", 0))
+
     if cudagraphs and bsize != 1:
         raise NotImplementedError(
             "cudagraphs is not yet supported for batch sizes greater than 1"
@@ -630,7 +656,11 @@ def paged_generate(
     kwargs["mask"] = __create_prefill_mask(model_input_lengths, device=input_ids.device)
     sequence_ids: Optional[List[int]] = None
     block_mapping_max = ((max_len + max_new_tokens) // 16) + 1
+
+    gen_tokens = 0
+
     for i in range(max_new_tokens):
+
         input_ids = next_input[:, -max_seq_len:]
 
         kwargs["cache_data"] = kv_cache_manager.allocate_tokens(
@@ -661,9 +691,14 @@ def paged_generate(
         else:
             next_val = torch.argmax(logits, dim=-1).unsqueeze(0).t()
 
+        if local_rank == 0:
+            max_logit = torch.max(logits)
+            print("%6d %.3f" % (next_val[0][0].item(), max_logit.item()))
+
         result = torch.cat((result, next_val), dim=-1)
 
         next_input = next_val
+        gen_tokens += 1
 
         if i == 0:
             ttft = time.time() - start_time
@@ -672,5 +707,10 @@ def paged_generate(
             sequence_ids = kwargs["cache_data"].sequence_ids
             model_input_lengths = [1 for _ in range(bsize)]
 
+        # stop!
+        if next_input == 0:
+            break
+
     kv_cache_manager.free_sequences(sequence_ids)  # type: ignore
-    return result, max_new_tokens, ttft, (time.time() - start_time)
+
+    return result, gen_tokens, ttft, (time.time() - start_time)

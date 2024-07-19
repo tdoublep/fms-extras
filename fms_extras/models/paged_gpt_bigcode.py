@@ -9,12 +9,17 @@ from fms.modules.feedforward import FeedForwardBlock
 from fms.utils import serialization
 from fms.utils.activation import str_to_activation
 from fms.utils.config import ModelConfig
+from fms.distributed.strategy import DistributedStrategy, NoOpStrategy
 
 from fms_extras.modules.attention import PagedMultiHeadAttention
 from fms_extras.utils.cache.paged import (
     PagedAttentionCacheData,
     PagedAttentionCacheDataLayer,
 )
+
+
+import os
+local_rank = int(os.getenv("LOCAL_RANK", 0))
 
 
 @dataclass
@@ -26,7 +31,7 @@ class PagedGPTBigCodeConfig(ModelConfig):
     pad_id: int = 0
     max_pos: int = 512
     hidden_grow_factor: float = 4.0
-    activation_fn: str = "gelu-tanh"
+    activation_fn: str = "gelu"
     p_dropout: float = 0.0
     emb_dropout: float = 0.0
     multiquery_attn: bool = True
@@ -37,6 +42,7 @@ class PagedGPTBigCodeBlock(nn.Module):
     def __init__(self, config: PagedGPTBigCodeConfig):
         super().__init__()
         self.config = config
+        self.debug = False
 
         self.ln = nn.LayerNorm(self.config.emb_dim, self.config.ln_eps)
         self.ff_ln = nn.LayerNorm(self.config.emb_dim, self.config.ln_eps)
@@ -50,6 +56,10 @@ class PagedGPTBigCodeBlock(nn.Module):
             p_dropout=self.config.p_dropout,
             use_bias=True,
         )
+
+        #print("[PagedGPTBigCodeBlock::ctor] self.config.emb_dim: ", self.config.emb_dim)
+        #print("[PagedGPTBigCodeBlock::ctor] self.config.hidden_grow_factor: ", self.config.hidden_grow_factor)
+        #print("[PagedGPTBigCodeBlock::ctor] activation_fn: ", str_to_activation(self.config.activation_fn))
 
         self.ff_sub_layer = FeedForwardBlock(
             self.config.emb_dim,
@@ -75,6 +85,10 @@ class PagedGPTBigCodeBlock(nn.Module):
         # first we do MHA and Add&Norm
         residual = x
         x = self.ln(x)
+
+        if self.debug and local_rank==0:
+            print("[PagedGPTBigCodeBlock::forward] x: ", x)
+
         # self attention
         x = self.attn(
             q=x,
@@ -88,22 +102,38 @@ class PagedGPTBigCodeBlock(nn.Module):
             is_causal_mask=is_causal_mask,
         )
 
+        if self.debug and local_rank==0:
+            print("[PagedGPTBigCodeBlock::forward] x (post-attn): ", x[0])
+
         cache = None
         if use_cache:
             x, cache = x
         if self.config.p_dropout != 0:
             x = self.dropout(x)
+
         # residual connection
         x = x + residual
 
         # then we do FF and Add&Norm
         residual = x
         x = self.ff_ln(x)
+
+        if self.debug and local_rank==0:
+            print("[PagedGPTBigCodeBlock::forward] x (post ff_ln): ", x)
+
         x = self.ff_sub_layer(x)
+
+        if self.debug and local_rank==0:
+            print("[PagedGPTBigCodeBlock::forward] x (post ff_sub_layer): ", x)
+
         if self.config.p_dropout != 0:
             x = self.dropout(x)
+
         # another residual
         x = x + residual
+
+        if self.debug and local_rank==0:
+            print("[PagedGPTBigCodeBlock::forward] x (end): ", x)
 
         if use_cache:
             return x, cache
@@ -112,18 +142,24 @@ class PagedGPTBigCodeBlock(nn.Module):
 
 
 class PagedGPTBigCodeHeadless(nn.Module):
-    def __init__(self, config: PagedGPTBigCodeConfig):
+    def __init__(self, config: PagedGPTBigCodeConfig, distributed_strategy: DistributedStrategy):
         super().__init__()
         self.config = config
+        self.distributed_strategy = distributed_strategy
 
-        self.layers = nn.ModuleList(
-            [PagedGPTBigCodeBlock(self.config) for _ in range(self.config.nlayers)]
-        )
+        layers = []
+        for i in range(self.config.nlayers):
+            block = PagedGPTBigCodeBlock(self.config)
+            block_module = self.distributed_strategy.distribute_layer(block, i)
+            layers.append(block_module)
+        self.layers = nn.ModuleList(layers)
 
         self.embedding = nn.Embedding(self.config.src_vocab_size, self.config.emb_dim)
         self.position_embedding = nn.Embedding(self.config.max_pos, self.config.emb_dim)
 
-        self.dec_norm = nn.LayerNorm(self.config.emb_dim, eps=self.config.ln_eps)
+        self.dec_norm = self.distributed_strategy.distribute_module(
+            nn.LayerNorm(self.config.emb_dim, eps=self.config.ln_eps), final_layers=True
+        )
 
         if self.config.emb_dropout:
             self.emb_dropout = nn.Dropout(self.config.emb_dropout)
@@ -143,6 +179,8 @@ class PagedGPTBigCodeHeadless(nn.Module):
         # x_in: batch_size x seq_len
         # mask: batch_size x seq_len x seq_len
         # bias: nheads x seq_len x seq_len
+        #debug = x[0][0] == 0
+        debug = False
 
         qlen = x.size(1)
         filled_cache = False
@@ -165,6 +203,9 @@ class PagedGPTBigCodeHeadless(nn.Module):
 
         x_emb = self.embedding(x)
 
+        if local_rank == 0 and debug:
+            print("[PagedGPTBigCodeHeadless::forward] x_emb: ", x_emb)
+
         # if pad_id exists
         #   is_pad will be a BoolTensor
         #   otherwise pad_id will not be taken into account
@@ -184,12 +225,19 @@ class PagedGPTBigCodeHeadless(nn.Module):
         # look up position embeddings
         position_out = self.position_embedding(position_ids)
 
+        if local_rank == 0 and debug:
+            print("[PagedGPTBigCodeHeadless::forward] position_out: ", position_out)
+
         # zero out the associated position embeddings
         if self.config.pad_id is not None:
             position_out = position_out.mul(~is_pad.unsqueeze(-1))
 
         # perform absolute position embedding
         x = x_emb + position_out
+
+        if local_rank == 0 and debug:
+            print("[PagedGPTBigCodeHeadless::forward] x (after sum): ", x)
+
 
         # apply dropout to embeddings
         if self.config.emb_dropout:
@@ -199,6 +247,10 @@ class PagedGPTBigCodeHeadless(nn.Module):
         present_key_value_states = []
 
         for i, layer in enumerate(self.layers):
+            if i == 0 and debug:
+                layer.debug = True
+            else:
+                layer.debug = False
             output = layer(
                 x=x,
                 mask=mask,
@@ -229,6 +281,7 @@ class PagedGPTBigCode(nn.Module):
     def __init__(
         self,
         config: Optional[PagedGPTBigCodeConfig] = None,
+        distributed_strategy: DistributedStrategy = NoOpStrategy,
         **kwargs,
     ):
         super(PagedGPTBigCode, self).__init__()
@@ -237,8 +290,9 @@ class PagedGPTBigCode(nn.Module):
         else:
             self.config = PagedGPTBigCodeConfig()
         self.config = self.config.updated(**kwargs)
+        self.distributed_strategy = distributed_strategy
 
-        self.base_model = PagedGPTBigCodeHeadless(self.config)
+        self.base_model = PagedGPTBigCodeHeadless(self.config, self.distributed_strategy)
         self.head = nn.Linear(
             self.config.emb_dim, self.config.src_vocab_size, bias=False
         )
@@ -272,6 +326,11 @@ class PagedGPTBigCode(nn.Module):
         attn_algorithm: Optional[str] = None,
         return_embeds: bool = False,
     ):
+
+        #if local_rank == 0:
+        #    print("[PagedGPTBigCode::forward] x: ", x)
+        #    print("[PagedGPTBigCode::forward] mask: ", mask)
+
         embeds, cache = self.base_model(
             x,
             mask,
@@ -279,6 +338,10 @@ class PagedGPTBigCode(nn.Module):
             use_cache=use_cache,
             attn_algorithm=attn_algorithm,
         )
+
+        #if local_rank == 0:
+        #    print("[PagedGPTBigCode::forward] embeds.shape: ", embeds.shape)
+        #    print("[PagedGPTBigCode::forward] embeds: ", embeds)
 
         preds = self.head(embeds)
 
